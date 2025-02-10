@@ -1,0 +1,20 @@
+---
+source: src/lib.rs
+expression: "<Symbol!(\"hello\")>::new()"
+---
+Cons(
+    'h',
+    Cons(
+        'e',
+        Cons(
+            'l',
+            Cons(
+                'l',
+                Cons(
+                    'o',
+                    Nil,
+                ),
+            ),
+        ),
+    ),
+)

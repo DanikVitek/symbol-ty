@@ -1,0 +1,24 @@
+[package]
+name = "symbol-ty"
+version = "0.1.0"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+readme = "README.md"
+
+[dependencies]
+symbol-ty-macro = { path = "symbol-ty-macro" }
+
+[dev-dependencies]
+insta = "1.42"
+
+[workspace]
+members = [
+    "symbol-ty-macro",
+    "examples/foreign_crate",
+]
+
+[workspace.package]
+license = "MIT OR Apache License 2.0"
+edition = "2021"
+authors = ["Danik Vitek <x3665107@gmail.com>"]
