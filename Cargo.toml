@@ -7,7 +7,7 @@ license.workspace = true
 readme = "README.md"
 
 [dependencies]
-symbol-ty-macro = { path = "symbol-ty-macro" }
+symbol-ty-macro = { path = "symbol-ty-macro", version = "0.1.0" }
 
 [dev-dependencies]
 insta = "1.42"
