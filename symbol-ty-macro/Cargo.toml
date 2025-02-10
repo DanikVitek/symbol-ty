@@ -4,6 +4,7 @@ version = "0.1.0"
 license.workspace = true
 authors.workspace = true
 edition.workspace = true
+repository.workspace = true
 
 [lib]
 proc-macro = true
