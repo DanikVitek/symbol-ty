@@ -6,6 +6,7 @@ authors.workspace = true
 license.workspace = true
 readme = "README.md"
 repository.workspace = true
+description = "A library for generating symbols as type-level strings."
 
 [dependencies]
 symbol-ty-macro = { path = "symbol-ty-macro", version = "0.1.0" }

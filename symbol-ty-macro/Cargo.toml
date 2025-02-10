@@ -5,6 +5,7 @@ license.workspace = true
 authors.workspace = true
 edition.workspace = true
 repository.workspace = true
+description = "A procedural macro for generating symbols as type-level strings."
 
 [lib]
 proc-macro = true
