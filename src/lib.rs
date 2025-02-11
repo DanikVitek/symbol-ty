@@ -95,7 +95,9 @@ impl<const C: char, Tail: fmt::Debug> fmt::Debug for Cons<C, Tail> {
     }
 }
 
+/// Iterator over the characters of a given symbol.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[must_use = "iterators are lazy and do nothing unless consumed"]
 pub struct Chars<const C: char, Tail> {
     used_c: bool,
     tail: Tail,
@@ -193,5 +195,27 @@ mod tests {
     #[test]
     fn test_iter_rev() {
         insta_assert!(<Symbol!("hello")>::chars().rev().collect::<String>());
+    }
+    
+    #[test]
+    fn test_fuse() {
+        let mut chars = <Symbol!("abc")>::chars();
+        assert_eq!(chars.next(), Some('a'));
+        assert_eq!(chars.next(), Some('b'));
+        assert_eq!(chars.next(), Some('c'));
+        assert_eq!(chars.next(), None);
+        assert_eq!(chars.next(), None);
+        assert_eq!(chars.next(), None);
+    }
+
+    #[test]
+    fn test_rev_fuse() {
+        let mut chars = <Symbol!("abc")>::chars().rev();
+        assert_eq!(chars.next(), Some('c'));
+        assert_eq!(chars.next(), Some('b'));
+        assert_eq!(chars.next(), Some('a'));
+        assert_eq!(chars.next(), None);
+        assert_eq!(chars.next(), None);
+        assert_eq!(chars.next(), None);
     }
 }
