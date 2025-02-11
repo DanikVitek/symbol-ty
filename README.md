@@ -11,7 +11,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-symbol-ty = "0.1"
+symbol-ty = "0.2"
 ```
 
 ## Example
