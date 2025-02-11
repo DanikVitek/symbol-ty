@@ -191,12 +191,12 @@ mod tests {
     fn test_iter() {
         insta_assert!(<Symbol!("hello")>::chars().collect::<String>());
     }
-    
+
     #[test]
     fn test_iter_rev() {
         insta_assert!(<Symbol!("hello")>::chars().rev().collect::<String>());
     }
-    
+
     #[test]
     fn test_fuse() {
         let mut chars = <Symbol!("abc")>::chars();
@@ -217,5 +217,12 @@ mod tests {
         assert_eq!(chars.next(), None);
         assert_eq!(chars.next(), None);
         assert_eq!(chars.next(), None);
+    }
+    
+    #[test]
+    fn mem_size_zero() {
+        assert_eq!(size_of::<Symbol!("")>(), 0);
+        assert_eq!(size_of::<Symbol!("foo_bar")>(), 0);
+        assert_eq!(size_of::<Symbol!("foo bar baz")>(), 0);
     }
 }
