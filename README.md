@@ -2,6 +2,9 @@
 
 [![Crates.io](https://img.shields.io/crates/v/symbol-ty)](https://crates.io/crates/symbol-ty)
 [![Docs.rs](https://docs.rs/symbol-ty/badge.svg)](https://docs.rs/symbol-ty)
+[![Crates.io MSRV](https://img.shields.io/crates/msrv/symbol-ty)](https://crates.io/crates/symbol-ty)
+[![Crates.io Downloads](https://img.shields.io/crates/d/symbol-ty)](https://crates.io/crates/symbol-ty)
+[![Crates.io License](https://img.shields.io/crates/l/symbol-ty)](https://crates.io/crates/symbol-ty)
 
 A simple crate that allows to create a type that represents a unique symbol.
 
