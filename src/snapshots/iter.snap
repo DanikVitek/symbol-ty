@@ -1,0 +1,5 @@
+---
+source: src/lib.rs
+expression: "<Symbol!(\"hello\")>::new().into_iter().collect::<String>()"
+---
+"hello"
