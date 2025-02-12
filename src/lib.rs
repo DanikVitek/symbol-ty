@@ -3,9 +3,20 @@
 #![no_std]
 
 #[cfg(feature = "unstable__deref")]
+extern crate alloc;
+
+#[cfg(feature = "unstable__deref")]
+use alloc::{boxed::Box, string::String};
+#[cfg(feature = "unstable__deref")]
 use core::{any::TypeId, ops::Deref};
 use core::{fmt, fmt::Write, hash::Hash, iter::FusedIterator};
 
+#[cfg(feature = "unstable__deref")]
+use hashbrown::HashMap;
+#[cfg(feature = "unstable__deref")]
+use once_cell::unsync::Lazy;
+#[cfg(feature = "unstable__deref")]
+use parking_lot::{const_fair_mutex, FairMutex};
 pub use symbol_ty_macro::Symbol;
 
 /// A single character of the symbol, followed by the rest of the symbol.
@@ -157,14 +168,13 @@ impl Deref for Nil {
 
 #[cfg(feature = "unstable__deref")]
 struct SymbolStore {
-    dereferenced_symbols: once_cell::unsync::Lazy<hashbrown::HashMap<TypeId, &'static str>>,
+    dereferenced_symbols: Lazy<HashMap<TypeId, &'static str>>,
 }
 
 #[cfg(feature = "unstable__deref")]
-static SYMBOL_STORE: parking_lot::FairMutex<SymbolStore> =
-    parking_lot::const_fair_mutex(SymbolStore {
-        dereferenced_symbols: once_cell::unsync::Lazy::new(hashbrown::HashMap::new),
-    });
+static SYMBOL_STORE: FairMutex<SymbolStore> = const_fair_mutex(SymbolStore {
+    dereferenced_symbols: Lazy::new(HashMap::new),
+});
 
 #[cfg(feature = "unstable__deref")]
 impl<const C: char, Tail: Symbol + 'static> Deref for Cons<C, Tail> {
@@ -177,9 +187,6 @@ impl<const C: char, Tail: Symbol + 'static> Deref for Cons<C, Tail> {
             .dereferenced_symbols
             .entry(type_id)
             .or_insert_with(|| {
-                extern crate alloc;
-                use alloc::{boxed::Box, string::String};
-
                 let mut buf = String::with_capacity(Self::LEN);
                 write!(&mut buf, "{self}").unwrap();
                 Box::leak::<'static>(buf.into_boxed_str())
@@ -203,9 +210,6 @@ impl<const C: char, Tail: Symbol + 'static> AsRef<str> for Cons<C, Tail> {
 
 #[cfg(feature = "unstable__deref")]
 pub fn free<S: 'static>() {
-    extern crate alloc;
-    use alloc::boxed::Box;
-
     let type_id = TypeId::of::<S>();
     if let Some(symbol) = SYMBOL_STORE.lock().dereferenced_symbols.remove(&type_id) {
         _ = unsafe { Box::from_raw(symbol as *const str as *mut str) };
@@ -219,9 +223,6 @@ pub fn free_ref<S: 'static>(_: &S) {
 
 #[cfg(feature = "unstable__deref")]
 pub fn free_all() {
-    extern crate alloc;
-    use alloc::boxed::Box;
-
     for (_, symbol) in SYMBOL_STORE.lock().dereferenced_symbols.drain() {
         _ = unsafe { Box::from_raw(symbol as *const str as *mut str) };
     }
@@ -430,7 +431,7 @@ mod tests {
                 assert_eq!(SYMBOL_STORE.lock().dereferenced_symbols.len(), 1);
                 free::<Symbol!("hi")>();
                 assert_eq!(SYMBOL_STORE.lock().dereferenced_symbols.len(), 0);
-                
+
                 std::thread::scope(|s| {
                     assert_eq!(&*<Symbol!("hi")>::new(), "hi");
                     assert_eq!(SYMBOL_STORE.lock().dereferenced_symbols.len(), 1);

@@ -21,6 +21,6 @@ jobs:
     - name: Run tests
       run: cargo test --workspace --verbose && cargo test --workspace --verbose -F unstable__deref
     - name: Verify MSRV
-      run: cargo install cargo-msrv --locked && cargo msrv verify --ignore-lockfile --verbose && cargo msrv verify --ignore-lockfile --verbose --features unstable__deref
+      run: cargo install cargo-msrv --locked && cargo msrv verify --ignore-lockfile && cargo msrv verify --ignore-lockfile --features unstable__deref
     - name: Run examples
       run: cargo run -p foreign_crate --verbose
