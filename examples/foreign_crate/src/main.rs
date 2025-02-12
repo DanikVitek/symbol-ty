@@ -1,4 +1,4 @@
-use core::fmt;
+use core::{fmt, ops::Deref};
 
 use symbol_ty::Symbol;
 
@@ -27,6 +27,20 @@ where
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 #[allow(non_camel_case_types)]
 struct foo_bar;
+
+impl Deref for foo_bar {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        "foo_bar"
+    }
+}
+
+impl AsRef<str> for foo_bar {
+    fn as_ref(&self) -> &str {
+        "foo_bar"
+    }
+}
 
 impl Symbol for foo_bar {
     const LEN: usize = 7;
