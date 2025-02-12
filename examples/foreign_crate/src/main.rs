@@ -29,6 +29,8 @@ where
 struct foo_bar;
 
 impl Symbol for foo_bar {
+    const LEN: usize = 7;
+
     type Chars = Chars_foo_bar;
 
     fn new() -> Self {

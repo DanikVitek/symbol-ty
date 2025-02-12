@@ -10,10 +10,17 @@ repository.workspace = true
 description = "A library for generating symbols as type-level strings."
 
 [dependencies]
+hashbrown = { version = "0.15", optional = true }
+once_cell = { version = "1.20", default-features = false, optional = true }
+parking_lot = { version = "0.12", optional = true }
 symbol-ty-macro = { path = "symbol-ty-macro", version = "0.1.1" }
 
 [dev-dependencies]
 insta = "1.42"
+
+[features]
+default = []
+unstable__deref = ["dep:once_cell", "dep:hashbrown", "dep:parking_lot"]
 
 [workspace]
 members = [
