@@ -2,8 +2,21 @@
 
 #![no_std]
 
+#[cfg(feature = "unstable__deref")]
+extern crate alloc;
+
+#[cfg(feature = "unstable__deref")]
+use alloc::{boxed::Box, string::String};
+#[cfg(feature = "unstable__deref")]
+use core::{any::TypeId, ops::Deref};
 use core::{fmt, fmt::Write, hash::Hash, iter::FusedIterator};
 
+#[cfg(feature = "unstable__deref")]
+use hashbrown::HashMap;
+#[cfg(feature = "unstable__deref")]
+use once_cell::unsync::Lazy;
+#[cfg(feature = "unstable__deref")]
+use parking_lot::{const_fair_mutex, FairMutex};
 pub use symbol_ty_macro::Symbol;
 
 /// A single character of the symbol, followed by the rest of the symbol.
@@ -14,8 +27,44 @@ pub struct Cons<const C: char, Tail>(Tail);
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Nil;
 
+#[cfg(not(feature = "unstable__deref"))]
+pub trait SymbolBounds: fmt::Display + fmt::Debug + Default + Eq + Ord + Copy + Hash {}
+#[cfg(not(feature = "unstable__deref"))]
+impl<T> SymbolBounds for T where T: fmt::Display + fmt::Debug + Default + Eq + Ord + Copy + Hash {}
+
+#[cfg(feature = "unstable__deref")]
+pub trait SymbolBounds:
+    'static
+    + fmt::Display
+    + fmt::Debug
+    + Default
+    + Eq
+    + Ord
+    + Copy
+    + Hash
+    + Deref<Target = str>
+    + AsRef<str>
+{
+}
+#[cfg(feature = "unstable__deref")]
+impl<T> SymbolBounds for T where
+    T: 'static
+        + fmt::Display
+        + fmt::Debug
+        + Default
+        + Eq
+        + Ord
+        + Copy
+        + Hash
+        + Deref<Target = str>
+        + AsRef<str>
+{
+}
+
 /// A symbol, which is a type-level string.
-pub trait Symbol: fmt::Display + fmt::Debug + Default + Eq + Ord + Copy + Sized + Hash {
+pub trait Symbol: SymbolBounds {
+    const LEN: usize;
+
     type Chars: Iterator<Item = char>;
 
     /// Get an instance of the symbol.
@@ -26,6 +75,8 @@ pub trait Symbol: fmt::Display + fmt::Debug + Default + Eq + Ord + Copy + Sized 
 }
 
 impl Symbol for Nil {
+    const LEN: usize = 0;
+
     type Chars = core::iter::Empty<char>;
 
     #[inline(always)]
@@ -40,6 +91,8 @@ impl Symbol for Nil {
 }
 
 impl<const C: char, Tail: Symbol> Symbol for Cons<C, Tail> {
+    const LEN: usize = char_utf8_len(C) + Tail::LEN;
+
     type Chars = Chars<C, <Tail as Symbol>::Chars>;
 
     fn new() -> Self {
@@ -51,6 +104,15 @@ impl<const C: char, Tail: Symbol> Symbol for Cons<C, Tail> {
             used_c: false,
             tail: Tail::chars(),
         }
+    }
+}
+
+const fn char_utf8_len(c: char) -> usize {
+    match c as u32 {
+        0..=127 => 1,
+        0x80..=0x7FF => 2,
+        0x800..=0xFFFF => 3,
+        0x10000..=u32::MAX => 4,
     }
 }
 
@@ -92,6 +154,77 @@ impl<const C: char, Tail: fmt::Display> fmt::Display for Cons<C, Tail> {
 impl<const C: char, Tail: fmt::Debug> fmt::Debug for Cons<C, Tail> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Cons").field(&C).field(&self.0).finish()
+    }
+}
+
+#[cfg(feature = "unstable__deref")]
+impl Deref for Nil {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        ""
+    }
+}
+
+#[cfg(feature = "unstable__deref")]
+struct SymbolStore {
+    dereferenced_symbols: Lazy<HashMap<TypeId, &'static str>>,
+}
+
+#[cfg(feature = "unstable__deref")]
+static SYMBOL_STORE: FairMutex<SymbolStore> = const_fair_mutex(SymbolStore {
+    dereferenced_symbols: Lazy::new(HashMap::new),
+});
+
+#[cfg(feature = "unstable__deref")]
+impl<const C: char, Tail: Symbol + 'static> Deref for Cons<C, Tail> {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        let type_id = TypeId::of::<Self>();
+        SYMBOL_STORE
+            .lock()
+            .dereferenced_symbols
+            .entry(type_id)
+            .or_insert_with(|| {
+                let mut buf = String::with_capacity(Self::LEN);
+                write!(&mut buf, "{self}").unwrap();
+                Box::leak::<'static>(buf.into_boxed_str())
+            })
+    }
+}
+
+#[cfg(feature = "unstable__deref")]
+impl AsRef<str> for Nil {
+    fn as_ref(&self) -> &str {
+        ""
+    }
+}
+
+#[cfg(feature = "unstable__deref")]
+impl<const C: char, Tail: Symbol + 'static> AsRef<str> for Cons<C, Tail> {
+    fn as_ref(&self) -> &str {
+        self
+    }
+}
+
+#[cfg(feature = "unstable__deref")]
+pub fn free<S: 'static>() {
+    let type_id = TypeId::of::<S>();
+    if let Some(symbol) = SYMBOL_STORE.lock().dereferenced_symbols.remove(&type_id) {
+        _ = unsafe { Box::from_raw(symbol as *const str as *mut str) };
+    }
+}
+
+#[cfg(feature = "unstable__deref")]
+pub fn free_ref<S: 'static>(_: &S) {
+    free::<S>();
+}
+
+#[cfg(feature = "unstable__deref")]
+pub fn free_all() {
+    for (_, symbol) in SYMBOL_STORE.lock().dereferenced_symbols.drain() {
+        _ = unsafe { Box::from_raw(symbol as *const str as *mut str) };
     }
 }
 
@@ -218,11 +351,124 @@ mod tests {
         assert_eq!(chars.next(), None);
         assert_eq!(chars.next(), None);
     }
-    
+
     #[test]
     fn mem_size_zero() {
         assert_eq!(size_of::<Symbol!("")>(), 0);
         assert_eq!(size_of::<Symbol!("foo_bar")>(), 0);
         assert_eq!(size_of::<Symbol!("foo bar baz")>(), 0);
+    }
+
+    #[cfg(feature = "unstable__deref")]
+    mod deref {
+        use std::sync::atomic::AtomicBool;
+
+        use super::*;
+        use crate::{free, free_all, free_ref, SYMBOL_STORE};
+
+        static BUSY: AtomicBool = AtomicBool::new(false);
+
+        fn run_test<F: FnOnce()>(f: F) {
+            while BUSY.swap(true, std::sync::atomic::Ordering::SeqCst) {
+                std::thread::yield_now();
+            }
+            f();
+            free_all();
+            BUSY.store(false, std::sync::atomic::Ordering::SeqCst);
+        }
+
+        #[test]
+        fn test_deref() {
+            run_test(|| {
+                assert_eq!(SYMBOL_STORE.lock().dereferenced_symbols.len(), 0);
+
+                assert_eq!(&*<Symbol!("hello")>::new(), "hello");
+                assert_eq!(SYMBOL_STORE.lock().dereferenced_symbols.len(), 1);
+                assert_eq!(&*<Symbol!("hello")>::new(), "hello");
+                assert_eq!(SYMBOL_STORE.lock().dereferenced_symbols.len(), 1);
+                assert_eq!(&*<Symbol!("hello")>::new(), "hello");
+                assert_eq!(SYMBOL_STORE.lock().dereferenced_symbols.len(), 1);
+                assert_eq!(&*<Symbol!("hello")>::new(), "hello");
+                assert_eq!(SYMBOL_STORE.lock().dereferenced_symbols.len(), 1);
+
+                std::thread::scope(|s| {
+                    assert_eq!(&*<Symbol!("hi")>::new(), "hi");
+                    assert_eq!(SYMBOL_STORE.lock().dereferenced_symbols.len(), 2);
+
+                    s.spawn(|| {
+                        assert_eq!(&*<Symbol!("hi")>::new(), "hi");
+                        assert_eq!(SYMBOL_STORE.lock().dereferenced_symbols.len(), 2);
+                        assert_eq!(&*<Symbol!("hi")>::new(), "hi");
+                        assert_eq!(SYMBOL_STORE.lock().dereferenced_symbols.len(), 2);
+                    });
+
+                    assert_eq!(&*<Symbol!("hi")>::new(), "hi");
+                    assert_eq!(SYMBOL_STORE.lock().dereferenced_symbols.len(), 2);
+                });
+
+                assert_eq!(&*<Symbol!("")>::new(), "");
+                assert_eq!(SYMBOL_STORE.lock().dereferenced_symbols.len(), 2);
+                assert_eq!(&*<Symbol!("")>::new(), "");
+                assert_eq!(SYMBOL_STORE.lock().dereferenced_symbols.len(), 2);
+                assert_eq!(&*<Symbol!("")>::new(), "");
+                assert_eq!(SYMBOL_STORE.lock().dereferenced_symbols.len(), 2);
+                assert_eq!(&*<Symbol!("")>::new(), "");
+                assert_eq!(SYMBOL_STORE.lock().dereferenced_symbols.len(), 2);
+            });
+        }
+
+        #[test]
+        fn test_free() {
+            run_test(|| {
+                assert_eq!(SYMBOL_STORE.lock().dereferenced_symbols.len(), 0);
+
+                assert_eq!(&*<Symbol!("hello")>::new(), "hello");
+                assert_eq!(SYMBOL_STORE.lock().dereferenced_symbols.len(), 1);
+                assert_eq!(&*<Symbol!("hi")>::new(), "hi");
+                assert_eq!(SYMBOL_STORE.lock().dereferenced_symbols.len(), 2);
+
+                free::<Symbol!("hello")>();
+                assert_eq!(SYMBOL_STORE.lock().dereferenced_symbols.len(), 1);
+                free::<Symbol!("hi")>();
+                assert_eq!(SYMBOL_STORE.lock().dereferenced_symbols.len(), 0);
+
+                std::thread::scope(|s| {
+                    assert_eq!(&*<Symbol!("hi")>::new(), "hi");
+                    assert_eq!(SYMBOL_STORE.lock().dereferenced_symbols.len(), 1);
+
+                    s.spawn(|| {
+                        assert_eq!(&*<Symbol!("hi")>::new(), "hi");
+                        assert_eq!(SYMBOL_STORE.lock().dereferenced_symbols.len(), 1);
+                        free::<Symbol!("hi")>();
+                        assert_eq!(SYMBOL_STORE.lock().dereferenced_symbols.len(), 0);
+                    });
+
+                    assert_eq!(&*<Symbol!("hi")>::new(), "hi");
+                    assert_eq!(SYMBOL_STORE.lock().dereferenced_symbols.len(), 1);
+                })
+            });
+        }
+
+        #[test]
+        fn test_free_ref() {
+            run_test(|| {
+                assert_eq!(SYMBOL_STORE.lock().dereferenced_symbols.len(), 0);
+
+                fn use_symbol(s: &impl Symbol) {
+                    let _s: &str = s;
+                    free_ref(s);
+                }
+
+                assert_eq!(&*<Symbol!("hello")>::new(), "hello");
+                assert_eq!(SYMBOL_STORE.lock().dereferenced_symbols.len(), 1);
+                assert_eq!(&*<Symbol!("hi")>::new(), "hi");
+                assert_eq!(SYMBOL_STORE.lock().dereferenced_symbols.len(), 2);
+
+                use_symbol(&<Symbol!("hello")>::new());
+                assert_eq!(SYMBOL_STORE.lock().dereferenced_symbols.len(), 1);
+                use_symbol(&<Symbol!("hi")>::new());
+                assert_eq!(SYMBOL_STORE.lock().dereferenced_symbols.len(), 0);
+            });
+        }
     }
 }

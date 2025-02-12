@@ -30,8 +30,7 @@ pub fn Symbol(input: TokenStream) -> TokenStream {
     parse_macro_input!(input as LitStr)
         .value()
         .chars()
-        .rev()
-        .fold(
+        .rfold(
             parse_quote_spanned!(Span::mixed_site() => #cratename::Nil),
             |ty: Type, ch| parse_quote_spanned!(Span::mixed_site() => #cratename::Cons<#ch, #ty>),
         )
